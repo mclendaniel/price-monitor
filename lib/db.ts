@@ -1,4 +1,4 @@
-import { createClient } from '@vercel/postgres';
+import { sql } from '@vercel/postgres';
 
 export interface Item {
   id: number;
@@ -13,53 +13,32 @@ export interface Item {
   updated_at: string;
 }
 
-async function getClient() {
-  const client = createClient();
-  await client.connect();
-  return client;
-}
-
 // Initialize database schema
 export async function initDb() {
-  const client = await getClient();
-  try {
-    await client.sql`
-      CREATE TABLE IF NOT EXISTS items (
-        id SERIAL PRIMARY KEY,
-        url TEXT UNIQUE NOT NULL,
-        handle TEXT NOT NULL,
-        store_domain TEXT NOT NULL,
-        title TEXT,
-        image_url TEXT,
-        original_price INTEGER,
-        current_price INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
-  } finally {
-    await client.end();
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS items (
+      id SERIAL PRIMARY KEY,
+      url TEXT UNIQUE NOT NULL,
+      handle TEXT NOT NULL,
+      store_domain TEXT NOT NULL,
+      title TEXT,
+      image_url TEXT,
+      original_price INTEGER,
+      current_price INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
 }
 
 export async function getAllItems(): Promise<Item[]> {
-  const client = await getClient();
-  try {
-    const { rows } = await client.sql<Item>`SELECT * FROM items ORDER BY created_at DESC`;
-    return rows;
-  } finally {
-    await client.end();
-  }
+  const { rows } = await sql<Item>`SELECT * FROM items ORDER BY created_at DESC`;
+  return rows;
 }
 
 export async function getItemById(id: number): Promise<Item | undefined> {
-  const client = await getClient();
-  try {
-    const { rows } = await client.sql<Item>`SELECT * FROM items WHERE id = ${id}`;
-    return rows[0];
-  } finally {
-    await client.end();
-  }
+  const { rows } = await sql<Item>`SELECT * FROM items WHERE id = ${id}`;
+  return rows[0];
 }
 
 export async function addItem(item: {
@@ -71,37 +50,22 @@ export async function addItem(item: {
   original_price: number;
   current_price: number;
 }): Promise<Item> {
-  const client = await getClient();
-  try {
-    const { rows } = await client.sql<Item>`
-      INSERT INTO items (url, handle, store_domain, title, image_url, original_price, current_price)
-      VALUES (${item.url}, ${item.handle}, ${item.store_domain}, ${item.title}, ${item.image_url}, ${item.original_price}, ${item.current_price})
-      RETURNING *
-    `;
-    return rows[0];
-  } finally {
-    await client.end();
-  }
+  const { rows } = await sql<Item>`
+    INSERT INTO items (url, handle, store_domain, title, image_url, original_price, current_price)
+    VALUES (${item.url}, ${item.handle}, ${item.store_domain}, ${item.title}, ${item.image_url}, ${item.original_price}, ${item.current_price})
+    RETURNING *
+  `;
+  return rows[0];
 }
 
 export async function updateItemPrice(id: number, currentPrice: number): Promise<void> {
-  const client = await getClient();
-  try {
-    await client.sql`
-      UPDATE items
-      SET current_price = ${currentPrice}, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${id}
-    `;
-  } finally {
-    await client.end();
-  }
+  await sql`
+    UPDATE items
+    SET current_price = ${currentPrice}, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${id}
+  `;
 }
 
 export async function deleteItem(id: number): Promise<void> {
-  const client = await getClient();
-  try {
-    await client.sql`DELETE FROM items WHERE id = ${id}`;
-  } finally {
-    await client.end();
-  }
+  await sql`DELETE FROM items WHERE id = ${id}`;
 }
