@@ -1,4 +1,6 @@
-import { sql } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.DATABASE_URL || process.env.POSTGRES_URL!);
 
 export interface Item {
   id: number;
@@ -32,13 +34,13 @@ export async function initDb() {
 }
 
 export async function getAllItems(): Promise<Item[]> {
-  const { rows } = await sql<Item>`SELECT * FROM items ORDER BY created_at DESC`;
-  return rows;
+  const rows = await sql`SELECT * FROM items ORDER BY created_at DESC`;
+  return rows as Item[];
 }
 
 export async function getItemById(id: number): Promise<Item | undefined> {
-  const { rows } = await sql<Item>`SELECT * FROM items WHERE id = ${id}`;
-  return rows[0];
+  const rows = await sql`SELECT * FROM items WHERE id = ${id}`;
+  return rows[0] as Item | undefined;
 }
 
 export async function addItem(item: {
@@ -50,12 +52,12 @@ export async function addItem(item: {
   original_price: number;
   current_price: number;
 }): Promise<Item> {
-  const { rows } = await sql<Item>`
+  const rows = await sql`
     INSERT INTO items (url, handle, store_domain, title, image_url, original_price, current_price)
     VALUES (${item.url}, ${item.handle}, ${item.store_domain}, ${item.title}, ${item.image_url}, ${item.original_price}, ${item.current_price})
     RETURNING *
   `;
-  return rows[0];
+  return rows[0] as Item;
 }
 
 export async function updateItemPrice(id: number, currentPrice: number): Promise<void> {
