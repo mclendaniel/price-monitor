@@ -14,9 +14,15 @@ export default function Home() {
     try {
       const response = await fetch('/api/items');
       const data = await response.json();
-      setItems(data);
+      if (response.ok && Array.isArray(data)) {
+        setItems(data);
+      } else {
+        console.error('API error:', data);
+        setItems([]);
+      }
     } catch (error) {
       console.error('Failed to fetch items:', error);
+      setItems([]);
     } finally {
       setLoading(false);
     }
