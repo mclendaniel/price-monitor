@@ -1,6 +1,17 @@
-import { neon } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 
-const sql = neon(process.env.DATABASE_URL || process.env.POSTGRES_URL!);
+let sql: NeonQueryFunction<false, false>;
+
+function getDb() {
+  if (!sql) {
+    const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+    if (!connectionString) {
+      throw new Error('DATABASE_URL or POSTGRES_URL environment variable is required');
+    }
+    sql = neon(connectionString);
+  }
+  return sql;
+}
 
 export interface Item {
   id: number;
@@ -17,7 +28,8 @@ export interface Item {
 
 // Initialize database schema
 export async function initDb() {
-  await sql`
+  const db = getDb();
+  await db`
     CREATE TABLE IF NOT EXISTS items (
       id SERIAL PRIMARY KEY,
       url TEXT UNIQUE NOT NULL,
@@ -34,12 +46,14 @@ export async function initDb() {
 }
 
 export async function getAllItems(): Promise<Item[]> {
-  const rows = await sql`SELECT * FROM items ORDER BY created_at DESC`;
+  const db = getDb();
+  const rows = await db`SELECT * FROM items ORDER BY created_at DESC`;
   return rows as Item[];
 }
 
 export async function getItemById(id: number): Promise<Item | undefined> {
-  const rows = await sql`SELECT * FROM items WHERE id = ${id}`;
+  const db = getDb();
+  const rows = await db`SELECT * FROM items WHERE id = ${id}`;
   return rows[0] as Item | undefined;
 }
 
@@ -52,7 +66,8 @@ export async function addItem(item: {
   original_price: number;
   current_price: number;
 }): Promise<Item> {
-  const rows = await sql`
+  const db = getDb();
+  const rows = await db`
     INSERT INTO items (url, handle, store_domain, title, image_url, original_price, current_price)
     VALUES (${item.url}, ${item.handle}, ${item.store_domain}, ${item.title}, ${item.image_url}, ${item.original_price}, ${item.current_price})
     RETURNING *
@@ -61,7 +76,8 @@ export async function addItem(item: {
 }
 
 export async function updateItemPrice(id: number, currentPrice: number): Promise<void> {
-  await sql`
+  const db = getDb();
+  await db`
     UPDATE items
     SET current_price = ${currentPrice}, updated_at = CURRENT_TIMESTAMP
     WHERE id = ${id}
@@ -69,5 +85,6 @@ export async function updateItemPrice(id: number, currentPrice: number): Promise
 }
 
 export async function deleteItem(id: number): Promise<void> {
-  await sql`DELETE FROM items WHERE id = ${id}`;
+  const db = getDb();
+  await db`DELETE FROM items WHERE id = ${id}`;
 }
