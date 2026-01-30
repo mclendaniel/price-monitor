@@ -1,24 +1,4 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-
-const dbPath = path.join(process.cwd(), 'price-monitor.db');
-const db = new Database(dbPath);
-
-// Initialize database schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    url TEXT UNIQUE NOT NULL,
-    handle TEXT NOT NULL,
-    store_domain TEXT NOT NULL,
-    title TEXT,
-    image_url TEXT,
-    original_price INTEGER,
-    current_price INTEGER,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+import { sql } from '@vercel/postgres';
 
 export interface Item {
   id: number;
@@ -33,17 +13,35 @@ export interface Item {
   updated_at: string;
 }
 
-export function getAllItems(): Item[] {
-  const stmt = db.prepare('SELECT * FROM items ORDER BY created_at DESC');
-  return stmt.all() as Item[];
+// Initialize database schema
+export async function initDb() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS items (
+      id SERIAL PRIMARY KEY,
+      url TEXT UNIQUE NOT NULL,
+      handle TEXT NOT NULL,
+      store_domain TEXT NOT NULL,
+      title TEXT,
+      image_url TEXT,
+      original_price INTEGER,
+      current_price INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
 }
 
-export function getItemById(id: number): Item | undefined {
-  const stmt = db.prepare('SELECT * FROM items WHERE id = ?');
-  return stmt.get(id) as Item | undefined;
+export async function getAllItems(): Promise<Item[]> {
+  const { rows } = await sql<Item>`SELECT * FROM items ORDER BY created_at DESC`;
+  return rows;
 }
 
-export function addItem(item: {
+export async function getItemById(id: number): Promise<Item | undefined> {
+  const { rows } = await sql<Item>`SELECT * FROM items WHERE id = ${id}`;
+  return rows[0];
+}
+
+export async function addItem(item: {
   url: string;
   handle: string;
   store_domain: string;
@@ -51,35 +49,23 @@ export function addItem(item: {
   image_url: string;
   original_price: number;
   current_price: number;
-}): Item {
-  const stmt = db.prepare(`
+}): Promise<Item> {
+  const { rows } = await sql<Item>`
     INSERT INTO items (url, handle, store_domain, title, image_url, original_price, current_price)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
-  const result = stmt.run(
-    item.url,
-    item.handle,
-    item.store_domain,
-    item.title,
-    item.image_url,
-    item.original_price,
-    item.current_price
-  );
-  return getItemById(result.lastInsertRowid as number)!;
+    VALUES (${item.url}, ${item.handle}, ${item.store_domain}, ${item.title}, ${item.image_url}, ${item.original_price}, ${item.current_price})
+    RETURNING *
+  `;
+  return rows[0];
 }
 
-export function updateItemPrice(id: number, currentPrice: number): void {
-  const stmt = db.prepare(`
+export async function updateItemPrice(id: number, currentPrice: number): Promise<void> {
+  await sql`
     UPDATE items
-    SET current_price = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `);
-  stmt.run(currentPrice, id);
+    SET current_price = ${currentPrice}, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${id}
+  `;
 }
 
-export function deleteItem(id: number): void {
-  const stmt = db.prepare('DELETE FROM items WHERE id = ?');
-  stmt.run(id);
+export async function deleteItem(id: number): Promise<void> {
+  await sql`DELETE FROM items WHERE id = ${id}`;
 }
-
-export default db;

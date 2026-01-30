@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllItems, addItem } from '@/lib/db';
+import { getAllItems, addItem, initDb } from '@/lib/db';
 import { fetchProductData } from '@/lib/scraper';
 
 export async function GET() {
   try {
-    const items = getAllItems();
+    await initDb();
+    const items = await getAllItems();
     return NextResponse.json(items);
   } catch (error) {
     console.error('Error fetching items:', error);
@@ -17,6 +18,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    await initDb();
     const body = await request.json();
     const { url } = body;
 
@@ -31,7 +33,7 @@ export async function POST(request: NextRequest) {
     const productData = await fetchProductData(url);
 
     // Add to database
-    const item = addItem({
+    const item = await addItem({
       url,
       handle: productData.handle,
       store_domain: productData.store_domain,
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : 'Failed to add item';
 
     // Check for unique constraint violation
-    if (message.includes('UNIQUE constraint')) {
+    if (message.includes('unique') || message.includes('duplicate')) {
       return NextResponse.json(
         { error: 'This product is already being monitored' },
         { status: 409 }

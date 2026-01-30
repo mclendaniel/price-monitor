@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getAllItems, updateItemPrice } from '@/lib/db';
+import { getAllItems, updateItemPrice, initDb } from '@/lib/db';
 import { fetchCurrentPrice } from '@/lib/scraper';
 
 export async function POST() {
   try {
-    const items = getAllItems();
+    await initDb();
+    const items = await getAllItems();
     const results: { id: number; success: boolean; error?: string }[] = [];
 
     // Fetch current prices for all items
@@ -12,7 +13,7 @@ export async function POST() {
       items.map(async (item) => {
         try {
           const currentPrice = await fetchCurrentPrice(item.store_domain, item.handle);
-          updateItemPrice(item.id, currentPrice);
+          await updateItemPrice(item.id, currentPrice);
           results.push({ id: item.id, success: true });
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Unknown error';
@@ -22,7 +23,7 @@ export async function POST() {
     );
 
     // Return updated items
-    const updatedItems = getAllItems();
+    const updatedItems = await getAllItems();
 
     return NextResponse.json({
       items: updatedItems,

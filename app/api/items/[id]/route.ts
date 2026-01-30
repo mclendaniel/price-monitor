@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { deleteItem, getItemById } from '@/lib/db';
+import { deleteItem, getItemById, initDb } from '@/lib/db';
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await initDb();
     const { id } = await params;
     const itemId = parseInt(id, 10);
 
@@ -16,7 +17,7 @@ export async function DELETE(
       );
     }
 
-    const item = getItemById(itemId);
+    const item = await getItemById(itemId);
     if (!item) {
       return NextResponse.json(
         { error: 'Item not found' },
@@ -24,7 +25,7 @@ export async function DELETE(
       );
     }
 
-    deleteItem(itemId);
+    await deleteItem(itemId);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting item:', error);
