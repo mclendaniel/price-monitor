@@ -18,11 +18,17 @@ export default function AddItemForm({ onItemAdded }: AddItemFormProps) {
     setLoading(true);
     setError(null);
 
+    // Auto-add https:// if missing
+    let normalizedUrl = url.trim();
+    if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+      normalizedUrl = 'https://' + normalizedUrl;
+    }
+
     try {
       const response = await fetch('/api/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: normalizedUrl }),
       });
 
       const data = await response.json();
@@ -44,10 +50,10 @@ export default function AddItemForm({ onItemAdded }: AddItemFormProps) {
     <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto">
       <div className="flex gap-3">
         <input
-          type="url"
+          type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="Paste any Shopify product URL"
+          placeholder="Paste any Shopify product URL (e.g. toddsnyder.com/products/...)"
           className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
           disabled={loading}
         />
