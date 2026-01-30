@@ -39,14 +39,14 @@ async function refreshPrices() {
     items.map(async (item) => {
       try {
         const newPrice = await fetchCurrentPrice(item.store_domain, item.handle);
-        const oldPrice = item.current_price;
+        const originalPrice = item.original_price;
 
-        // Check for price drop
-        if (oldPrice && newPrice < oldPrice) {
-          const percentOff = Math.round((1 - newPrice / oldPrice) * 100);
+        // Check for price drop (current price below original)
+        if (originalPrice && newPrice < originalPrice) {
+          const percentOff = Math.round((1 - newPrice / originalPrice) * 100);
           priceDrops.push({
             title: item.title || 'Unknown Item',
-            oldPrice,
+            oldPrice: originalPrice,
             newPrice,
             url: item.url,
             percentOff,
