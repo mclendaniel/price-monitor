@@ -1,18 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllItems, updateItemPrice, initDb } from '@/lib/db';
+import { getAllItems, updateItemPrice, initDb, getSetting } from '@/lib/db';
 import { fetchCurrentPrice } from '@/lib/scraper';
+import { Resend } from 'resend';
+
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+interface PriceDrop {
+  title: string;
+  oldPrice: number;
+  newPrice: number;
+  url: string;
+  percentOff: number;
+}
+
+async function sendPriceDropEmail(drops: PriceDrop[], email: string) {
+  if (!resend || drops.length === 0) return;
+
+  const itemsList = drops.map(d =>
+    `• ${d.title}\n  Was: $${(d.oldPrice / 100).toFixed(2)} → Now: $${(d.newPrice / 100).toFixed(2)} (${d.percentOff}% off)\n  ${d.url}`
+  ).join('\n\n');
+
+  await resend.emails.send({
+    from: 'Price Monitor <onboarding@resend.dev>',
+    to: email,
+    subject: `🔔 Price Drop Alert: ${drops.length} item${drops.length > 1 ? 's' : ''} dropped!`,
+    text: `Good news! The following items have dropped in price:\n\n${itemsList}`,
+  });
+}
 
 async function refreshPrices() {
   await initDb();
   const items = await getAllItems();
   const results: { id: number; success: boolean; error?: string }[] = [];
+  const priceDrops: PriceDrop[] = [];
 
   // Fetch current prices for all items
   await Promise.all(
     items.map(async (item) => {
       try {
-        const currentPrice = await fetchCurrentPrice(item.store_domain, item.handle);
-        await updateItemPrice(item.id, currentPrice);
+        const newPrice = await fetchCurrentPrice(item.store_domain, item.handle);
+        const oldPrice = item.current_price;
+
+        // Check for price drop
+        if (oldPrice && newPrice < oldPrice) {
+          const percentOff = Math.round((1 - newPrice / oldPrice) * 100);
+          priceDrops.push({
+            title: item.title || 'Unknown Item',
+            oldPrice,
+            newPrice,
+            url: item.url,
+            percentOff,
+          });
+        }
+
+        await updateItemPrice(item.id, newPrice);
         results.push({ id: item.id, success: true });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
@@ -21,10 +62,22 @@ async function refreshPrices() {
     })
   );
 
+  // Send email if there are price drops
+  if (priceDrops.length > 0) {
+    const alertEmail = await getSetting('alert_email');
+    if (alertEmail) {
+      try {
+        await sendPriceDropEmail(priceDrops, alertEmail);
+      } catch (error) {
+        console.error('Failed to send price drop email:', error);
+      }
+    }
+  }
+
   // Return updated items
   const updatedItems = await getAllItems();
 
-  return { items: updatedItems, results };
+  return { items: updatedItems, results, priceDrops: priceDrops.length };
 }
 
 // GET handler for Vercel Cron

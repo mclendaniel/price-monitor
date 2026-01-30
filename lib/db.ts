@@ -72,3 +72,18 @@ export async function deleteItem(id: number): Promise<void> {
     where: { id }
   });
 }
+
+export async function getSetting(key: string): Promise<string | null> {
+  const setting = await prisma.settings.findUnique({
+    where: { key }
+  });
+  return setting?.value ?? null;
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  await prisma.settings.upsert({
+    where: { key },
+    update: { value },
+    create: { key, value }
+  });
+}
