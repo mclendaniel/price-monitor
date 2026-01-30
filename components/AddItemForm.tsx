@@ -53,7 +53,7 @@ export default function AddItemForm({ onItemAdded }: AddItemFormProps) {
           type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="Paste any Shopify product URL (e.g. toddsnyder.com/products/...)"
+          placeholder="Paste URL"
           className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
           disabled={loading}
         />

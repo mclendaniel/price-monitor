@@ -40,7 +40,7 @@ export async function fetchProductData(url: string): Promise<ProductData> {
 
   // If URL doesn't have /products/ path, it's not a Shopify product URL
   if (!handle) {
-    throw new Error(`This doesn't appear to be a Shopify store. Only Shopify stores are supported (URL should contain /products/).`);
+    throw new Error('This store is not supported');
   }
 
   const jsonUrl = `https://${domain}/products/${handle}.json`;
@@ -58,22 +58,19 @@ export async function fetchProductData(url: string): Promise<ProductData> {
   }
 
   if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error(`Product not found, or ${domain} is not a Shopify store.`);
-    }
-    throw new Error(`${domain} is not a Shopify store (or is blocking requests).`);
+    throw new Error('This store is not supported');
   }
 
   let data;
   try {
     data = await response.json();
   } catch {
-    throw new Error(`${domain} is not a Shopify store.`);
+    throw new Error('This store is not supported');
   }
 
   const product = data.product;
   if (!product) {
-    throw new Error(`${domain} is not a Shopify store.`);
+    throw new Error('This store is not supported');
   }
 
   // Get price from first available variant
