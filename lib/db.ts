@@ -1,17 +1,10 @@
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { PrismaClient } from '@prisma/client';
 
-let sql: NeonQueryFunction<false, false>;
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
-function getDb() {
-  if (!sql) {
-    const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL or POSTGRES_URL environment variable is required');
-    }
-    sql = neon(connectionString);
-  }
-  return sql;
-}
+export const prisma = globalForPrisma.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export interface Item {
   id: number;
@@ -22,39 +15,26 @@ export interface Item {
   image_url: string | null;
   original_price: number | null;
   current_price: number | null;
-  created_at: string;
-  updated_at: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
-// Initialize database schema
 export async function initDb() {
-  const db = getDb();
-  await db`
-    CREATE TABLE IF NOT EXISTS items (
-      id SERIAL PRIMARY KEY,
-      url TEXT UNIQUE NOT NULL,
-      handle TEXT NOT NULL,
-      store_domain TEXT NOT NULL,
-      title TEXT,
-      image_url TEXT,
-      original_price INTEGER,
-      current_price INTEGER,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `;
+  // Prisma handles migrations, no need to create tables manually
 }
 
 export async function getAllItems(): Promise<Item[]> {
-  const db = getDb();
-  const rows = await db`SELECT * FROM items ORDER BY created_at DESC`;
-  return rows as Item[];
+  const items = await prisma.item.findMany({
+    orderBy: { created_at: 'desc' }
+  });
+  return items as Item[];
 }
 
 export async function getItemById(id: number): Promise<Item | undefined> {
-  const db = getDb();
-  const rows = await db`SELECT * FROM items WHERE id = ${id}`;
-  return rows[0] as Item | undefined;
+  const item = await prisma.item.findUnique({
+    where: { id }
+  });
+  return item as Item | undefined;
 }
 
 export async function addItem(item: {
@@ -66,25 +46,29 @@ export async function addItem(item: {
   original_price: number;
   current_price: number;
 }): Promise<Item> {
-  const db = getDb();
-  const rows = await db`
-    INSERT INTO items (url, handle, store_domain, title, image_url, original_price, current_price)
-    VALUES (${item.url}, ${item.handle}, ${item.store_domain}, ${item.title}, ${item.image_url}, ${item.original_price}, ${item.current_price})
-    RETURNING *
-  `;
-  return rows[0] as Item;
+  const created = await prisma.item.create({
+    data: {
+      url: item.url,
+      handle: item.handle,
+      store_domain: item.store_domain,
+      title: item.title,
+      image_url: item.image_url,
+      original_price: item.original_price,
+      current_price: item.current_price,
+    }
+  });
+  return created as Item;
 }
 
 export async function updateItemPrice(id: number, currentPrice: number): Promise<void> {
-  const db = getDb();
-  await db`
-    UPDATE items
-    SET current_price = ${currentPrice}, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${id}
-  `;
+  await prisma.item.update({
+    where: { id },
+    data: { current_price: currentPrice }
+  });
 }
 
 export async function deleteItem(id: number): Promise<void> {
-  const db = getDb();
-  await db`DELETE FROM items WHERE id = ${id}`;
+  await prisma.item.delete({
+    where: { id }
+  });
 }
