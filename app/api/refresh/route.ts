@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllItems, updateItemPrice, initDb, getSetting } from '@/lib/db';
+import { getAllItems, updateItemPrice, updateNotifiedPrice, initDb, getSetting } from '@/lib/db';
 import { fetchCurrentPrice } from '@/lib/scraper';
 import { Resend } from 'resend';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 interface PriceDrop {
+  id: number;
   title: string;
   oldPrice: number;
   newPrice: number;
@@ -40,17 +41,21 @@ async function refreshPrices() {
       try {
         const newPrice = await fetchCurrentPrice(item.store_domain, item.handle);
         const originalPrice = item.original_price;
+        const notifiedPrice = item.notified_price;
 
-        // Check for price drop (current price below original)
+        // Check for price drop: below original AND (never notified OR lower than last notified)
         if (originalPrice && newPrice < originalPrice) {
-          const percentOff = Math.round((1 - newPrice / originalPrice) * 100);
-          priceDrops.push({
-            title: item.title || 'Unknown Item',
-            oldPrice: originalPrice,
-            newPrice,
-            url: item.url,
-            percentOff,
-          });
+          if (notifiedPrice === null || newPrice < notifiedPrice) {
+            const percentOff = Math.round((1 - newPrice / originalPrice) * 100);
+            priceDrops.push({
+              id: item.id,
+              title: item.title || 'Unknown Item',
+              oldPrice: originalPrice,
+              newPrice,
+              url: item.url,
+              percentOff,
+            });
+          }
         }
 
         await updateItemPrice(item.id, newPrice);
@@ -72,6 +77,10 @@ async function refreshPrices() {
       try {
         await sendPriceDropEmail(priceDrops, alertEmail);
         console.log('Email sent successfully');
+        // Update notified prices so we don't email again for same price
+        await Promise.all(
+          priceDrops.map(drop => updateNotifiedPrice(drop.id, drop.newPrice))
+        );
       } catch (error) {
         console.error('Failed to send price drop email:', error);
       }

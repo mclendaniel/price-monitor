@@ -16,6 +16,7 @@ model Item {
   image_url     String?
   original_price Int?
   current_price  Int?
+  notified_price Int?
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 

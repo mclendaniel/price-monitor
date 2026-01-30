@@ -15,6 +15,7 @@ export interface Item {
   image_url: string | null;
   original_price: number | null;
   current_price: number | null;
+  notified_price: number | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -64,6 +65,13 @@ export async function updateItemPrice(id: number, currentPrice: number): Promise
   await prisma.item.update({
     where: { id },
     data: { current_price: currentPrice }
+  });
+}
+
+export async function updateNotifiedPrice(id: number, notifiedPrice: number): Promise<void> {
+  await prisma.item.update({
+    where: { id },
+    data: { notified_price: notifiedPrice }
   });
 }
 
