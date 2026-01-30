@@ -1,4 +1,8 @@
-import { sql } from '@vercel/postgres';
+import { createPool } from '@vercel/postgres';
+
+const pool = createPool({
+  connectionString: process.env.POSTGRES_URL_NON_POOLING,
+});
 
 export interface Item {
   id: number;
@@ -15,7 +19,7 @@ export interface Item {
 
 // Initialize database schema
 export async function initDb() {
-  await sql`
+  await pool.sql`
     CREATE TABLE IF NOT EXISTS items (
       id SERIAL PRIMARY KEY,
       url TEXT UNIQUE NOT NULL,
@@ -32,12 +36,12 @@ export async function initDb() {
 }
 
 export async function getAllItems(): Promise<Item[]> {
-  const { rows } = await sql<Item>`SELECT * FROM items ORDER BY created_at DESC`;
+  const { rows } = await pool.sql<Item>`SELECT * FROM items ORDER BY created_at DESC`;
   return rows;
 }
 
 export async function getItemById(id: number): Promise<Item | undefined> {
-  const { rows } = await sql<Item>`SELECT * FROM items WHERE id = ${id}`;
+  const { rows } = await pool.sql<Item>`SELECT * FROM items WHERE id = ${id}`;
   return rows[0];
 }
 
@@ -50,7 +54,7 @@ export async function addItem(item: {
   original_price: number;
   current_price: number;
 }): Promise<Item> {
-  const { rows } = await sql<Item>`
+  const { rows } = await pool.sql<Item>`
     INSERT INTO items (url, handle, store_domain, title, image_url, original_price, current_price)
     VALUES (${item.url}, ${item.handle}, ${item.store_domain}, ${item.title}, ${item.image_url}, ${item.original_price}, ${item.current_price})
     RETURNING *
@@ -59,7 +63,7 @@ export async function addItem(item: {
 }
 
 export async function updateItemPrice(id: number, currentPrice: number): Promise<void> {
-  await sql`
+  await pool.sql`
     UPDATE items
     SET current_price = ${currentPrice}, updated_at = CURRENT_TIMESTAMP
     WHERE id = ${id}
@@ -67,5 +71,5 @@ export async function updateItemPrice(id: number, currentPrice: number): Promise
 }
 
 export async function deleteItem(id: number): Promise<void> {
-  await sql`DELETE FROM items WHERE id = ${id}`;
+  await pool.sql`DELETE FROM items WHERE id = ${id}`;
 }
