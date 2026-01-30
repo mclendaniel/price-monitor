@@ -63,11 +63,15 @@ async function refreshPrices() {
   );
 
   // Send email if there are price drops
+  console.log('Price drops detected:', priceDrops.length);
   if (priceDrops.length > 0) {
     const alertEmail = await getSetting('alert_email');
+    console.log('Alert email from DB:', alertEmail);
+    console.log('Resend configured:', !!resend);
     if (alertEmail) {
       try {
         await sendPriceDropEmail(priceDrops, alertEmail);
+        console.log('Email sent successfully');
       } catch (error) {
         console.error('Failed to send price drop email:', error);
       }
